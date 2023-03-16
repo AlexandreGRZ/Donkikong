@@ -20,6 +20,8 @@ void afficherRireDK();
 void afficherEchec(int nbEchecs);
 void afficherScore(int score);
 void afficherChiffre(int ligne, int colonne, int chiffre);
+void afficherImage(int ligne, int colonne, SDL_Surface *image);
+SDL_Surface *chargerImage(const char *nomImage);
 
 void effacerCarres(int ligne, int colonne, int nbLignes = 1, int nbColonnes = 1);
 void effacerPoints(int x, int y, int nbX = 1, int nbY = 1);

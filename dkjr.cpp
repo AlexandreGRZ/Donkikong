@@ -104,11 +104,30 @@ int main(int argc, char* argv[])
 	A.sa_flags = 0;
 	sigaction(SIGQUIT, &A, NULL);
 
+	struct sigaction B;
+	B.sa_handler = HandlerSIGALRM;
+	sigemptyset(&B.sa_mask);
+	B.sa_flags = 0;
+	sigaction(SIGALRM, &B, NULL);
+
+	struct sigaction C;
+	C.sa_handler = HandlerSIGUSR1;
+	sigemptyset(&C.sa_mask);
+	C.sa_flags = 0;
+	sigaction(SIGUSR1, &C, NULL);
+
+	struct sigaction D;
+	D.sa_handler = HandlerSIGUSR1;
+	sigemptyset(&D.sa_mask);
+	D.sa_flags = 0;
+	sigaction(SIGUSR1, &D, NULL);
+
 
 
 	pthread_mutex_init(&mutexGrilleJeu, NULL);
 	pthread_mutex_init(&mutexEvenement, NULL);
 	pthread_mutex_init(&mutexDK, NULL);
+	pthread_mutex_init(&mutexScore, NULL);
 
 	pthread_create(&threadCle, NULL, FctThreadCle, NULL);
 
@@ -117,7 +136,18 @@ int main(int argc, char* argv[])
 	pthread_create(&threadDKJr, NULL, FctThreadDKJr, NULL);
 
 	pthread_create(&threadDK, NULL, FctThreadDK, NULL);
-	
+
+	pthread_create(&threadScore, NULL, FctThreadScore, NULL);
+
+	pthread_create(&threadEnnemis, NULL, FctThreadEnnemis, NULL);
+
+
+
+
+	MAJScore = true;
+	score = 1140;
+	pthread_cond_signal(&condScore);
+
 	while(vie > 0)
 	{	
 		int nberror = 3;
@@ -228,13 +258,6 @@ void* FctThreadEvenements(void *)
 }
 
 
-
-
-
-
-
-
-
 void* FctThreadCle(void *)
 {
 	int i = 1, j = 1;
@@ -289,6 +312,7 @@ void* FctThreadDKJr(void* p)
 	sigfillset(&mask_DKJr);
 
 	sigdelset(&mask_DKJr, SIGQUIT);
+	sigdelset(&mask_DKJr, SIGINT);
 
 	sigprocmask(SIG_SETMASK, &mask_DKJr, NULL);
 
@@ -347,48 +371,70 @@ void* FctThreadDKJr(void* p)
 					case SDLK_UP:
 
 							if( (positionDKJr >= 2 && positionDKJr <= 4) || positionDKJr == 6)
-							{
-								setGrilleJeu(3, positionDKJr);
-								effacerCarres(11, (positionDKJr * 2) + 7, 2, 2); //On efface DKJR de l'emplacement en bas
-
-								setGrilleJeu(2, positionDKJr, DKJR);
-								afficherDKJr(10, (positionDKJr * 2) + 7, 8); //on actualise sa position quand il a sauté
-								
-								printf("State: LIBRE_BAS --- Event: KEY_UP\n");
-								afficherGrilleJeu();
-
-								pthread_mutex_unlock(&mutexGrilleJeu);
-								nanosleep(&temps, NULL);
-								pthread_mutex_lock(&mutexGrilleJeu);
-
-								setGrilleJeu(2, positionDKJr);
-								effacerCarres(10, (positionDKJr * 2) + 7, 2, 2); //On efface DKJR d'en haut pour ensuite le refaire tomber (effet de gravité)
-
-								setGrilleJeu(3, positionDKJr, DKJR);
-								afficherDKJr(11, (positionDKJr * 2) + 7, ((positionDKJr - 1) % 4) + 1);
-								
-								printf("State: LIBRE_BAS --- Event: Gravity after KEY_UP\n");
-								afficherGrilleJeu();
-							}
-							else
-							{
-								setGrilleJeu(3, positionDKJr);
-								effacerCarres(11, (positionDKJr * 2) + 7, 2, 2);
-
-								setGrilleJeu(2, positionDKJr, DKJR);
-								if(positionDKJr == 7)
+							{	
+								if(grilleJeu[2][positionDKJr].type == CORBEAU)
 								{
-									etatDKJr = DOUBLE_LIANE_BAS;
-									afficherDKJr(10, (positionDKJr * 2) + 7, 5); //On affiche l'image 8 car DKJR se tient aux deux lianes
+									kill(getpid(), SIGUSR1);
+									pthread_mutex_unlock(&mutexGrilleJeu);
+									pthread_mutex_unlock(&mutexEvenement);
+									pthread_exit(0);
 								}
 								else
 								{
-									etatDKJr = LIANE_BAS;
-									afficherDKJr(10, (positionDKJr * 2) + 7, 7);
+									setGrilleJeu(3, positionDKJr);
+									effacerCarres(11, (positionDKJr * 2) + 7, 2, 2); //On efface DKJR de l'emplacement en bas
+
+									setGrilleJeu(2, positionDKJr, DKJR);
+									afficherDKJr(10, (positionDKJr * 2) + 7, 8); //on actualise sa position quand il a sauté
+									
+									printf("State: LIBRE_BAS --- Event: KEY_UP\n");
+									afficherGrilleJeu();
+
+									pthread_mutex_unlock(&mutexGrilleJeu);
+									nanosleep(&temps, NULL);
+									pthread_mutex_lock(&mutexGrilleJeu);
+
+									setGrilleJeu(2, positionDKJr);
+									effacerCarres(10, (positionDKJr * 2) + 7, 2, 2); //On efface DKJR d'en haut pour ensuite le refaire tomber (effet de gravité)
+
+									setGrilleJeu(3, positionDKJr, DKJR);
+									afficherDKJr(11, (positionDKJr * 2) + 7, ((positionDKJr - 1) % 4) + 1);
+									
+									printf("State: LIBRE_BAS --- Event: Gravity after KEY_UP\n");
+									afficherGrilleJeu();
+								}
+
+							}
+							else
+							{	
+								if(grilleJeu[2][positionDKJr].type == CORBEAU)
+								{
+									kill(getpid(), SIGUSR1);
+									pthread_mutex_unlock(&mutexGrilleJeu);
+									pthread_mutex_unlock(&mutexEvenement);
+									pthread_exit(0);
+								}
+								else
+								{
+									setGrilleJeu(3, positionDKJr);
+									effacerCarres(11, (positionDKJr * 2) + 7, 2, 2);
+
+									setGrilleJeu(2, positionDKJr, DKJR);
+									if(positionDKJr == 7)
+									{
+										etatDKJr = DOUBLE_LIANE_BAS;
+										afficherDKJr(10, (positionDKJr * 2) + 7, 5); //On affiche l'image 8 car DKJR se tient aux deux lianes
+									}
+									else
+									{
+										etatDKJr = LIANE_BAS;
+										afficherDKJr(10, (positionDKJr * 2) + 7, 7);
+									}
+									
+									printf("State: LIBRE_BAS --- Event: KEY_UP LIANE\n");
+									afficherGrilleJeu();
 								}
 								
-								printf("State: LIBRE_BAS --- Event: KEY_UP LIANE\n");
-								afficherGrilleJeu();
 							}
 						break;
 					
@@ -502,6 +548,9 @@ void* FctThreadDKJr(void* p)
 									afficherCage(4);
 									MAJDK = true;
 									pthread_cond_signal(&condDK);
+									MAJScore = true;
+									score += 10;
+									pthread_cond_signal(&condScore);
 									positionDKJr = 1;
 									setGrilleJeu(3, positionDKJr, DKJR);
 									afficherDKJr(11, (positionDKJr * 2) + 7, ((positionDKJr - 1) % 4) + 1);
@@ -678,6 +727,9 @@ void* FctThreadDK(void *)
 		{
 			effacerCarres(4, 9, 2, 2);
 			afficherRireDK();
+			MAJScore = true;
+			score += 10;
+			pthread_cond_signal(&condScore);
 			nanosleep(&temps, NULL);
 
 			effacerCarres(3, 8, 2, 2);
@@ -695,9 +747,171 @@ void* FctThreadDK(void *)
 	pthread_exit(0);
 }
 
+void* FctThreadScore(void *)
+{	
+	int tampon;
+	while(1)
+	{
+		pthread_cond_wait(&condScore, &mutexScore);
+
+		if(MAJScore)
+		{
+			if(score < 100)
+			{	
+
+				afficherChiffre(3, 26, 0);
+				afficherChiffre(3, 27, 0);
+				afficherChiffre(3, 28, score/10);
+				afficherChiffre(3, 29, 0);
+			}
+			else
+			{
+				if(score < 1000)
+				{	
+					afficherChiffre(3, 26, 0);
+					afficherChiffre(3, 27, ((score / 10) - ((score%100) / 10)) / 10);
+					afficherChiffre(3, 28, (score%100) / 10);
+					afficherChiffre(3, 29, 0);
+				}
+				else
+				{
+					afficherChiffre(3, 26, (score - ((score % 1000) - (score % 1000) % 100) - ((score % 1000) % 100)) / 1000);
+					afficherChiffre(3, 27, (((score % 1000) - (score % 1000) % 100) / 100 ));
+					afficherChiffre(3, 28, ((score % 1000) % 100) / 10 );
+					afficherChiffre(3, 29, 0);
+				}
+			}
+		}
+	}
+}
+
+void* FctThreadEnnemis(void *)
+{	
+	int number;
+	sigset_t mask_ennemie;
+	pthread_t threadcorbeau;
+	timespec t;
+
+	t.tv_nsec = 0;
+	t.tv_sec = delaiEnnemis / 1000.0;
+
+	sigfillset(&mask_ennemie);
+	sigdelset(&mask_ennemie, SIGALRM);
+	sigprocmask(SIG_SETMASK, &mask_ennemie, NULL);
+
+	alarm(15);
+
+	while(1)
+	{
+		number = rand()%2;
+		nanosleep(&t, NULL);
+		printf("delai : %d", delaiEnnemis);
+
+		if(number == 0)
+		{
+			printf("Corbeau \n");
+
+			pthread_create(&threadcorbeau, NULL, FctThreadCorbeau, NULL);
+		}
+		else
+		{
+			printf("croco \n");
+		}
+	}
+
+
+}
+void* FctThreadCorbeau(void *)
+{
+	
+	sigset_t mask_Corbeau;
+	pthread_t threadcorbeau;
+	timespec t;
+	int positionCorbeau = 0;
+
+
+	sigfillset(&mask_Corbeau);
+	sigdelset(&mask_Corbeau, SIGUSR1);
+	sigprocmask(SIG_SETMASK, &mask_Corbeau, NULL);
+
+
+	t.tv_nsec = 700000000;
+	t.tv_sec = 0;
+
+	while(1)
+	{
+		
+		pthread_mutex_lock(&mutexGrilleJeu);
+		if(positionCorbeau < 7)
+		{	
+			if(grilleJeu[2][positionCorbeau + 1].type == DKJR)
+			{
+				kill(getpid(), SIGINT);
+				pthread_mutex_unlock(&mutexGrilleJeu);
+				pthread_exit(0);
+			}
+			else
+			{
+				effacerCarres(9, (positionCorbeau * 2) + 8, 2, 2);
+				setGrilleJeu(2, positionCorbeau);
+				positionCorbeau ++;
+				setGrilleJeu(2, positionCorbeau, CORBEAU, pthread_self());
+				afficherCorbeau((positionCorbeau * 2) + 8, rand()%2  + 1);
+				afficherGrilleJeu();
+			}
+			
+		}	
+		else
+		{	
+			pthread_mutex_unlock(&mutexGrilleJeu);
+			setGrilleJeu(2, positionCorbeau);
+			effacerCarres(9, (positionCorbeau * 2) + 8, 2, 2);
+			printf("thread detruit ");
+			afficherGrilleJeu();
+			pthread_exit(0);
+		}
+		pthread_mutex_unlock(&mutexGrilleJeu);
+		nanosleep(&t, NULL);
+		
+
+		
+	}
+
+	pthread_exit(0);
+}
+
+
 
 
 void HandlerSIGQUIT(int)
 {
-	printf("coucou ");
+	printf("coucou\n");
+}
+
+void HandlerSIGALRM(int)
+{
+	delaiEnnemis -= 250;
+
+	alarm(15);
+}
+
+void HandlerSIGUSR1(int)
+{
+	pthread_t  tid = grilleJeu[2][positionDKJr].tid;
+	printf("merde\n");
+	effacerCarres(9,(positionDKJr * 2) + 7, 4, 2);
+	setGrilleJeu(2, positionDKJr);
+
+	pthread_cancel(tid);
+}
+
+void HandlerSIGINT(int)
+{	
+	printf("coucou\n");
+	pthread_t  tid = grilleJeu[2][positionDKJr].tid;
+	printf("merde\n");
+	effacerCarres(9,(positionDKJr * 2) + 7, 4, 2);
+	setGrilleJeu(2, positionDKJr);
+
+	pthread_cancel(tid);
 }
