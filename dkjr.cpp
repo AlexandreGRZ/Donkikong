@@ -87,7 +87,7 @@ typedef struct
 
 int main(int argc, char* argv[])
 {
-	int evt;
+	int evt, vie = 3;
 
 	ouvrirFenetreGraphique();
 
@@ -108,6 +108,7 @@ int main(int argc, char* argv[])
 
 	pthread_mutex_init(&mutexGrilleJeu, NULL);
 	pthread_mutex_init(&mutexEvenement, NULL);
+	pthread_mutex_init(&mutexDK, NULL);
 
 	pthread_create(&threadCle, NULL, FctThreadCle, NULL);
 
@@ -115,9 +116,27 @@ int main(int argc, char* argv[])
 
 	pthread_create(&threadDKJr, NULL, FctThreadDKJr, NULL);
 
+	pthread_create(&threadDK, NULL, FctThreadDK, NULL);
+	
+	while(vie > 0)
+	{	
+		int nberror = 3;
+		pthread_join(threadDKJr, NULL);
+
+		vie--;
+
+		nberror -= vie;
+
+		afficherEchec(nberror);
+
+		pthread_create(&threadDKJr, NULL, FctThreadDKJr, NULL);
+		
+	}
+	
+	
 	pthread_join(threadCle, NULL);
 	pthread_join(threadEvenements, NULL);
-	pthread_join(threadDKJr, NULL);
+	
 
 	
 }
@@ -228,9 +247,11 @@ void* FctThreadCle(void *)
 	
 	
 	while (1)
-	{
+	{	
+		pthread_mutex_lock(&mutexGrilleJeu);
 		effacerCarres(3, 12, 2, 4);
 		afficherCle(i);
+		pthread_mutex_unlock(&mutexGrilleJeu);
 
 		nanosleep(&t, NULL);
 
@@ -260,8 +281,8 @@ void* FctThreadDKJr(void* p)
 {
 
 	struct timespec temps;
-	temps.tv_sec = 1,4;
-	temps.tv_nsec = 0;
+	temps.tv_sec = 0;
+	temps.tv_nsec = 500000000;
 
 	sigset_t mask_DKJr;
 
@@ -309,6 +330,11 @@ void* FctThreadDKJr(void* p)
 					case SDLK_RIGHT:
 						if (positionDKJr < 7)
 						{	
+
+							if(positionDKJr == 0)
+							{
+								effacerCarres(11, 7, 2, 2);
+							}
 							printf("droit");
 							setGrilleJeu(3, positionDKJr);
 							effacerCarres(11, (positionDKJr * 2) + 7, 2, 2);
@@ -462,31 +488,54 @@ void* FctThreadDKJr(void* p)
 								{
 									setGrilleJeu(1, positionDKJr);
 									effacerCarres(7, (positionDKJr * 2) + 7, 2, 2);
-									
-									positionDKJr--;
-
 									etatDKJr = LIBRE_BAS;
-									setGrilleJeu(2, positionDKJr, DKJR);
-									afficherDKJr(10, (positionDKJr * 2) + 7, 8);
-									
-									printf("State: LIBRE_HAUT --- Event: KEY_LEFT\n");
-									afficherGrilleJeu();
-
-									pthread_mutex_unlock(&mutexGrilleJeu);
+									afficherDKJr(5, 12, 9);
 									nanosleep(&temps, NULL);
-									pthread_mutex_lock(&mutexGrilleJeu);
+									effacerCarres(5, 12, 3, 2);
 
-									setGrilleJeu(2, positionDKJr);
-									effacerCarres(10, (positionDKJr * 2) + 7, 2, 2);
+									effacerCarres(3, 12, 2, 4);
+									
+									afficherDKJr(3, 11, 10);
 
+									nanosleep(&temps, NULL);
+									effacerCarres(3, 11, 3, 2);
+									afficherCage(4);
+									MAJDK = true;
+									pthread_cond_signal(&condDK);
+									positionDKJr = 1;
 									setGrilleJeu(3, positionDKJr, DKJR);
 									afficherDKJr(11, (positionDKJr * 2) + 7, ((positionDKJr - 1) % 4) + 1);
-
-									printf("State: LIBRE_BAS --- Event: Chute...\n");
 									afficherGrilleJeu();
+
 								}
 								else
 								{
+									setGrilleJeu(1, positionDKJr);
+									effacerCarres(7, (positionDKJr * 2) + 7, 2, 2);
+									afficherGrilleJeu();
+									etatDKJr = LIBRE_BAS;
+
+									
+									afficherDKJr(14, 9 , 9);
+									nanosleep(&temps, NULL);
+									effacerCarres(5, 12, 3, 3);
+
+									afficherDKJr(6, 11 , 12);
+									nanosleep(&temps, NULL);
+									effacerCarres(6, 11, 3, 3);
+
+									afficherDKJr(14, 9 , 13);
+									nanosleep(&temps, NULL);
+
+									positionDKJr = 0;
+									setGrilleJeu(3, positionDKJr, DKJR);
+
+									afficherGrilleJeu();
+									pthread_mutex_unlock(&mutexGrilleJeu);
+									pthread_mutex_unlock(&mutexEvenement);
+									pthread_exit(0);
+
+
 
 								}
 							}
@@ -585,6 +634,67 @@ void* FctThreadDKJr(void* p)
 	}
 		pthread_exit(0);
 }
+
+void* FctThreadDK(void *)
+{	
+	int i = 0;
+	struct timespec temps;
+	temps.tv_nsec = 700000000;
+	temps.tv_sec = 0;
+	while(i < 5)
+	{
+		afficherCage(i);
+		i++;
+	}
+	i = 1;
+	while(1)
+	{
+		
+		
+	
+		pthread_cond_wait(&condDK, &mutexDK);
+
+		if(i < 4)
+		{
+			switch (i)
+			{
+				case 1:
+					effacerCarres(2, 7, 2, 2);
+					break;
+				
+				case 2:
+					effacerCarres(4, 7, 2, 2);
+					break;
+
+				case 3:
+					effacerCarres(2, 9, 2, 2);
+					break;
+			
+				
+			}
+			i++;
+		}
+		else
+		{
+			effacerCarres(4, 9, 2, 2);
+			afficherRireDK();
+			nanosleep(&temps, NULL);
+
+			effacerCarres(3, 8, 2, 2);
+			i = 0;
+			while(i < 5)
+			{
+				afficherCage(i);
+				i++;
+			}
+			i = 1;
+		}
+
+	}
+
+	pthread_exit(0);
+}
+
 
 
 void HandlerSIGQUIT(int)
